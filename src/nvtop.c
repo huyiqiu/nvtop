@@ -260,33 +260,49 @@ int main(int argc, char **argv) {
   timeout(interface_update_interval(interface));
 
   double time_slept = interface_update_interval(interface);
+  // 主循环，直到接收到退出信号
   while (!signal_exit) {
+    // 检查是否需要调整窗口大小
     if (signal_resize_win) {
-      signal_resize_win = 0;
-      update_window_size_to_terminal_size(interface);
+      signal_resize_win = 0; // 重置窗口大小改变的信号
+      update_window_size_to_terminal_size(interface); // 更新窗口大小以匹配终端大小
     }
+    // 检查和更新监控的GPU集合
     interface_check_monitored_gpu_change(&interface, allDevCount, &numMonitoredGpus, &monitoredGpus, &nonMonitoredGpus);
+    // 如果休眠时间达到界面更新间隔，则进行数据刷新
     if (time_slept >= interface_update_interval(interface)) {
+      // 刷新GPU动态信息
       gpuinfo_refresh_dynamic_info(&monitoredGpus);
+      // 如果界面没有冻结，则继续刷新进程信息
       if (!interface_freeze_processes(interface)) {
+        // 刷新GPU相关进程信息
         gpuinfo_refresh_processes(&monitoredGpus);
+        // 更新GPU利用率
         gpuinfo_utilisation_rate(&monitoredGpus);
+        // 根据进程信息修正GPU动态信息
         gpuinfo_fix_dynamic_info_from_process_info(&monitoredGpus);
       }
+      // 将当前数据保存到缓冲区
       save_current_data_to_ring(&monitoredGpus, interface);
       timeout(interface_update_interval(interface));
       time_slept = 0.;
     } else {
+      // 计算下一次休眠的时间
       int next_sleep = interface_update_interval(interface) - (int)time_slept;
       timeout(next_sleep);
     }
+
+    // 绘制GPU信息到ncurses界面
     draw_gpu_info_ncurses(numMonitoredGpus, &monitoredGpus, interface);
 
+    // 处理输入
     nvtop_time time_before_sleep, time_after_sleep;
     nvtop_get_current_time(&time_before_sleep);
     int input_char = getch();
     nvtop_get_current_time(&time_after_sleep);
     time_slept += nvtop_difftime(time_before_sleep, time_after_sleep) * 1000;
+
+    // 根据输入进行不同的处理
     switch (input_char) {
     case 27: // ESC
     {
